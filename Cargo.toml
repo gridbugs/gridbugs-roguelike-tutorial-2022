@@ -4,4 +4,9 @@ version = "0.1.0"
 authors = ["Stephen Sherratt <stephen@sherra.tt>"]
 edition = "2021"
 
-[dependencies]
+[dependencies.gridbugs]
+version = "0.5"
+features = [
+    "chargrid",
+    "chargrid_wgpu",
+]
