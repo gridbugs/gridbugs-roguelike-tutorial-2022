@@ -1,6 +1,23 @@
-use gridbugs::chargrid_wgpu;
+use gridbugs::{chargrid_ansi_terminal, chargrid_wgpu};
 
 mod app;
+
+// Command-line arguments
+struct Args {
+    terminal: bool,
+}
+
+impl Args {
+    pub fn parser() -> impl meap::Parser<Item = Self> {
+        meap::let_map! {
+            let {
+                terminal = flag("terminal").desc("run in a terminal");
+            } in {
+                Self { terminal }
+            }
+        }
+    }
+}
 
 // Create a context for running chargrid apps in a WGPU graphical window
 fn wgpu_context() -> chargrid_wgpu::Context {
@@ -32,7 +49,18 @@ fn wgpu_context() -> chargrid_wgpu::Context {
 }
 
 fn main() {
-    // Create the WGPU chargrid context and run the app
-    let context = wgpu_context();
-    context.run(app::app());
+    use meap::Parser;
+    let Args { terminal } = Args::parser().with_help_default().parse_env_or_exit();
+    let app = app::app();
+    if terminal {
+        // Run the app in an ANSI terminal chargrid context
+        use chargrid_ansi_terminal::{Context, FromTermInfoRgb};
+        let context = Context::new().expect("Failed to initialize terminal");
+        let colour = FromTermInfoRgb; // Use 256-colour encoding
+        context.run(app, colour);
+    } else {
+        // Run the app in a WGPU chargrid context
+        let context = wgpu_context();
+        context.run(app);
+    }
 }

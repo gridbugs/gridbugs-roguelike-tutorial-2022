@@ -9,6 +9,10 @@ version = "0.5"
 features = [
     "chargrid",
     "chargrid_wgpu",
+    "chargrid_ansi_terminal",
     "coord_2d",
     "direction",
 ]
+
+[dependencies]
+meap = "0.5"
