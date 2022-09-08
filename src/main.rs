@@ -1,4 +1,6 @@
-use gridbugs::{chargrid::control_flow::*, chargrid_wgpu};
+use gridbugs::chargrid_wgpu;
+
+mod app;
 
 // Create a context for running chargrid apps in a WGPU graphical window
 fn wgpu_context() -> chargrid_wgpu::Context {
@@ -29,22 +31,8 @@ fn wgpu_context() -> chargrid_wgpu::Context {
     })
 }
 
-// A placeholder chargrid app that displays the text "Hello, World!"
-fn app() -> App {
-    // Create a component which ignores its input and renders a string.
-    styled_string("Hello, World!".to_string(), Default::default())
-        .centre() // Display the text in the centre of the window.
-        .ignore_output() // Coerce the component's output type to `app::Output`.
-        .exit_on_close() // Terminate the program when the window is closed.
-        .catch_escape() // Intercept the escape key so we can terminate on escape.
-        .map(|res| match res {
-            // Terminate the program when the escape key is pressed.
-            Ok(app::Exit) | Err(Escape) => app::Exit,
-        })
-}
-
 fn main() {
     // Create the WGPU chargrid context and run the app
     let context = wgpu_context();
-    context.run(app());
+    context.run(app::app());
 }

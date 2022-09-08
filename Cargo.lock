@@ -823,6 +823,7 @@ checksum = "e40d20e82b8e562522e986dc2e3954f0bf50efd6b7a8e8247115ea08bd0d1b1d"
 dependencies = [
  "chargrid",
  "chargrid_wgpu",
+ "coord_2d",
 ]
 
 [[package]]
