@@ -518,6 +518,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "direction"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c56672976b806b6fe8e41998c6d0503cd02479c6059c47451ce8addc7871271"
+dependencies = [
+ "coord_2d",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -824,6 +833,7 @@ dependencies = [
  "chargrid",
  "chargrid_wgpu",
  "coord_2d",
+ "direction",
 ]
 
 [[package]]

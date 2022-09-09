@@ -10,4 +10,5 @@ features = [
     "chargrid",
     "chargrid_wgpu",
     "coord_2d",
+    "direction",
 ]
