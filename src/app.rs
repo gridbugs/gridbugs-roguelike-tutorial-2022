@@ -1,6 +1,7 @@
+use crate::game::{EntityToRender, Game, Tile};
 use gridbugs::{
     chargrid::{control_flow::*, prelude::*},
-    coord_2d::{Coord, Size},
+    coord_2d::Size,
     direction::CardinalDirection,
 };
 
@@ -29,33 +30,33 @@ fn game_action_from_input(input: Input) -> Option<GameAction> {
 
 // The state of the game
 struct GameData {
-    player_coord: Coord,
-    screen_size: Size,
+    game: Game,
 }
 
 impl GameData {
     fn new(screen_size: Size) -> Self {
-        // The player starts in the centre of the screen
-        let player_coord = screen_size.to_coord().unwrap() / 2;
-        Self {
-            player_coord,
-            screen_size,
-        }
-    }
-
-    // Move the player character one cell in the given direction
-    fn move_player(&mut self, direction: CardinalDirection) {
-        let new_player_coord = self.player_coord + direction.coord();
-        // Don't let the player walk off the screen
-        if new_player_coord.is_valid(self.screen_size) {
-            self.player_coord = new_player_coord;
-        }
+        let game = Game::new(screen_size);
+        Self { game }
     }
 
     // Update the game state by applying a game action
     fn handle_game_action(&mut self, game_action: GameAction) {
         match game_action {
-            GameAction::Move(direction) => self.move_player(direction),
+            GameAction::Move(direction) => self.game.move_player(direction),
+        }
+    }
+
+    // Associate each tile with a description of how to render it
+    fn render_cell_from_tile(&self, tile: Tile) -> RenderCell {
+        match tile {
+            Tile::Player => RenderCell::BLANK.with_character('@').with_bold(true),
+        }
+    }
+
+    fn render(&self, ctx: Ctx, fb: &mut FrameBuffer) {
+        for EntityToRender { coord, tile } in self.game.entities_to_render() {
+            let render_cell = self.render_cell_from_tile(tile);
+            fb.set_cell_relative_to_ctx(ctx, coord, 0, render_cell);
         }
     }
 }
@@ -68,12 +69,7 @@ impl Component for GameComponent {
     type State = GameData;
 
     fn render(&self, state: &Self::State, ctx: Ctx, fb: &mut FrameBuffer) {
-        // The player will be represented with a bold '@' sign
-        let render_cell_player = RenderCell::BLANK.with_character('@').with_bold(true);
-
-        // Draw the player character to the frame buffer relative to the current context, which
-        // allows this component to be nested inside other components.
-        fb.set_cell_relative_to_ctx(ctx, state.player_coord, 0, render_cell_player);
+        state.render(ctx, fb);
     }
 
     fn update(&mut self, state: &mut Self::State, _ctx: Ctx, event: Event) -> Self::Output {

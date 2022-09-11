@@ -602,6 +602,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90e5c1c8368803113bf0c9584fc495a58b86dc8a29edbf8fe877d21d9507e797"
 
 [[package]]
+name = "entity_table"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3430dd56b63e85a50163aec8256ec3af794e140352e41bbe5d56d7810d35609e"
+
+[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -869,6 +875,7 @@ dependencies = [
  "chargrid_wgpu",
  "coord_2d",
  "direction",
+ "entity_table",
 ]
 
 [[package]]

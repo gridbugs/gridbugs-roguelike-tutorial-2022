@@ -1,6 +1,7 @@
 use gridbugs::{chargrid_ansi_terminal, chargrid_wgpu};
 
 mod app;
+mod game;
 
 // Command-line arguments
 struct Args {

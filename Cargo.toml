@@ -12,6 +12,7 @@ features = [
     "chargrid_ansi_terminal",
     "coord_2d",
     "direction",
+    "entity_table",
 ]
 
 [dependencies]
