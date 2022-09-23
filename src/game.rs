@@ -24,6 +24,15 @@ pub enum Tile {
     Floor,
 }
 
+impl Tile {
+    pub fn is_wall(&self) -> bool {
+        match self {
+            Self::Wall | Self::DoorClosed | Self::DoorOpen => true,
+            _ => false,
+        }
+    }
+}
+
 // Generates the type for a database storing entities. Each field is a table which maps an `Entity`
 // (just a unique identifier) to a component value.
 // E.g.
@@ -357,5 +366,18 @@ impl Game {
         &self,
     ) -> impl Iterator<Item = (Coord, CellVisibility<&VisibleCellData>)> {
         self.visibility_grid.enumerate()
+    }
+
+    /// Returns true iff a wall has been seen by the player at the given coord
+    pub fn is_wall_known_at(&self, coord: Coord) -> bool {
+        if let Some(data) = self.visibility_grid.get_data(coord) {
+            data.entity_data
+                .feature
+                .as_ref()
+                .map(|entity_data| entity_data.tile.is_wall())
+                .unwrap_or(false)
+        } else {
+            false
+        }
     }
 }

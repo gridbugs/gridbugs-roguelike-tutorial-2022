@@ -64,13 +64,26 @@ impl GameData {
     }
 
     // Associate each tile with a description of how to render it
-    fn render_cell_from_entity_data(&self, visible_entity_data: &VisibleEntityData) -> RenderCell {
+    fn render_cell_from_entity_data(
+        &self,
+        visible_entity_data: &VisibleEntityData,
+        coord: Coord,
+    ) -> RenderCell {
         match visible_entity_data.tile {
             Tile::Player => RenderCell::BLANK.with_character('@').with_bold(true),
-            Tile::Wall => RenderCell::BLANK
-                .with_character('#')
-                .with_background(Rgba32::new_grey(255))
-                .with_foreground(Rgba32::new_grey(0)),
+            Tile::Wall => {
+                let is_wall_below = self.game.is_wall_known_at(coord + Coord::new(0, 1));
+                if is_wall_below {
+                    RenderCell::BLANK
+                        .with_character(' ')
+                        .with_background(Rgba32::new_grey(255))
+                } else {
+                    RenderCell::BLANK
+                        .with_character('▄')
+                        .with_background(Rgba32::new_grey(255))
+                        .with_foreground(Rgba32::new_grey(127))
+                }
+            }
             Tile::DoorClosed => RenderCell::BLANK
                 .with_character('+')
                 .with_background(Rgba32::new_grey(127))
@@ -101,7 +114,7 @@ impl GameData {
         ctx: Ctx,
         fb: &mut FrameBuffer,
     ) {
-        let render_cell = self.render_cell_from_entity_data(visible_entity_data);
+        let render_cell = self.render_cell_from_entity_data(visible_entity_data, coord);
         let depth = Self::layer_depth(layer);
         fb.set_cell_relative_to_ctx(ctx, coord, depth, render_cell);
     }
