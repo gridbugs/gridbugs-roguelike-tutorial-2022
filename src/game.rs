@@ -44,7 +44,8 @@ spatial_table::declare_layers_module! {
     }
 }
 
-use layers::{Layer, Layers};
+pub use layers::Layer;
+use layers::Layers;
 type SpatialTable = spatial_table::SpatialTable<Layers>;
 type Location = spatial_table::Location<Layer>;
 
@@ -125,6 +126,7 @@ impl World {
 pub struct EntityToRender {
     pub coord: Coord,
     pub tile: Tile,
+    pub layer: Layer,
 }
 
 // The state of the game
@@ -207,8 +209,15 @@ impl Game {
             .tile
             .iter()
             .filter_map(|(entity, &tile)| {
-                let coord = self.world.spatial_table.coord_of(entity)?;
-                Some(EntityToRender { tile, coord })
+                if let Some(&Location {
+                    coord,
+                    layer: Some(layer),
+                }) = self.world.spatial_table.location_of(entity)
+                {
+                    Some(EntityToRender { tile, coord, layer })
+                } else {
+                    None
+                }
             })
     }
 }

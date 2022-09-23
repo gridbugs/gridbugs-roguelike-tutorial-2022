@@ -1,4 +1,4 @@
-use crate::game::{EntityToRender, Game, Tile};
+use crate::game::{EntityToRender, Game, Layer, Tile};
 use gridbugs::{
     chargrid::{control_flow::*, prelude::*},
     coord_2d::Size,
@@ -66,10 +66,18 @@ impl GameData {
         }
     }
 
+    fn layer_depth(layer: Layer) -> i8 {
+        match layer {
+            Layer::Character => 1,
+            Layer::Feature => 0,
+        }
+    }
+
     fn render(&self, ctx: Ctx, fb: &mut FrameBuffer) {
-        for EntityToRender { coord, tile } in self.game.entities_to_render() {
+        for EntityToRender { coord, tile, layer } in self.game.entities_to_render() {
             let render_cell = self.render_cell_from_tile(tile);
-            fb.set_cell_relative_to_ctx(ctx, coord, 0, render_cell);
+            let depth = Self::layer_depth(layer);
+            fb.set_cell_relative_to_ctx(ctx, coord, depth, render_cell);
         }
     }
 }
