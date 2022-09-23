@@ -79,9 +79,11 @@ impl GameData {
 
     fn render(&self, ctx: Ctx, fb: &mut FrameBuffer) {
         for EntityToRender { coord, tile, layer } in self.game.entities_to_render() {
-            let render_cell = self.render_cell_from_tile(tile);
-            let depth = Self::layer_depth(layer);
-            fb.set_cell_relative_to_ctx(ctx, coord, depth, render_cell);
+            if self.game.is_coord_visible(coord) {
+                let render_cell = self.render_cell_from_tile(tile);
+                let depth = Self::layer_depth(layer);
+                fb.set_cell_relative_to_ctx(ctx, coord, depth, render_cell);
+            }
         }
     }
 }

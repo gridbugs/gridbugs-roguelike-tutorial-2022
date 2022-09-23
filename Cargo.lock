@@ -878,6 +878,7 @@ dependencies = [
  "entity_table",
  "rgb_int",
  "spatial_table",
+ "visible_area_detection",
 ]
 
 [[package]]
@@ -1607,6 +1608,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "shadowcast"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4418a6cfbc94fff774e1d58649246b54eab9d4d762321a8433fb270cc5c072d5"
+dependencies = [
+ "coord_2d",
+ "direction",
+ "num-traits",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1812,6 +1824,18 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "visible_area_detection"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42e8264bb79c53d0b79f0ec65973e929d2927ce7bdc80738e30784fbf488c255"
+dependencies = [
+ "direction",
+ "grid_2d",
+ "rgb_int",
+ "shadowcast",
+]
 
 [[package]]
 name = "waker-fn"

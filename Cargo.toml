@@ -15,6 +15,7 @@ features = [
     "entity_table",
     "spatial_table",
     "rgb_int",
+    "visible_area_detection",
 ]
 
 [dependencies]

@@ -2,7 +2,11 @@ use gridbugs::{
     coord_2d::{Coord, Size},
     direction::{CardinalDirection, Direction},
     entity_table::{self, entity_data, entity_update, Entity, EntityAllocator},
+    rgb_int::Rgb24,
     spatial_table,
+    visible_area_detection::{
+        vision_distance, CellVisibility, VisibilityGrid, World as VisibleWorld,
+    },
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -34,6 +38,7 @@ entity_table::declare_entity_module! {
         tile: Tile,
         solid: (),
         door_state: DoorState,
+        opacity: u8,
     }
 }
 use components::{Components, EntityData, EntityUpdate};
@@ -50,6 +55,8 @@ pub use layers::Layer;
 use layers::Layers;
 type SpatialTable = spatial_table::SpatialTable<Layers>;
 type Location = spatial_table::Location<Layer>;
+
+const PLAYER_VISION_DISTANCE: vision_distance::Circle = vision_distance::Circle::new_squared(1000);
 
 // The state of the game's world
 pub struct World {
@@ -97,6 +104,7 @@ impl World {
             entity_data! {
                 tile: Tile::Wall,
                 solid: (),
+                opacity: 255,
             },
         );
     }
@@ -119,6 +127,7 @@ impl World {
                 tile: Tile::DoorClosed,
                 door_state: DoorState::Closed,
                 solid: (),
+                opacity: 255,
             },
         );
     }
@@ -133,6 +142,30 @@ impl World {
     }
 }
 
+impl VisibleWorld for World {
+    type VisionDistance = vision_distance::Circle;
+
+    fn size(&self) -> Size {
+        self.spatial_table.grid_size()
+    }
+
+    fn get_opacity(&self, coord: Coord) -> u8 {
+        if let Some(&Layers {
+            feature: Some(feature_entity),
+            ..
+        }) = self.spatial_table.layers_at(coord)
+        {
+            self.components
+                .opacity
+                .get(feature_entity)
+                .cloned()
+                .unwrap_or(0)
+        } else {
+            0
+        }
+    }
+}
+
 // Information needed to render an entity
 pub struct EntityToRender {
     pub coord: Coord,
@@ -144,6 +177,7 @@ pub struct EntityToRender {
 pub struct Game {
     world: World,
     player_entity: Entity,
+    visibility_grid: VisibilityGrid,
 }
 
 impl Game {
@@ -166,10 +200,24 @@ impl Game {
         for coord in world_size.coord_iter_row_major() {
             world.spawn_floor(coord);
         }
-        Self {
+        let visibility_grid = VisibilityGrid::new(world_size);
+        let mut self_ = Self {
             world,
             player_entity,
-        }
+            visibility_grid,
+        };
+        self_.update_visibility();
+        self_
+    }
+
+    fn update_visibility(&mut self) {
+        let player_coord = self.get_player_coord();
+        self.visibility_grid.update(
+            Rgb24::new_grey(255),
+            &self.world,
+            PLAYER_VISION_DISTANCE,
+            player_coord,
+        );
     }
 
     fn open_door(&mut self, entity: Entity) {
@@ -179,6 +227,7 @@ impl Game {
                 door_state: Some(DoorState::Open),
                 tile: Some(Tile::DoorOpen),
                 solid: None,
+                opacity: None,
             },
         );
     }
@@ -190,6 +239,7 @@ impl Game {
                 door_state: DoorState::Closed,
                 tile: Tile::DoorClosed,
                 solid: (),
+                opacity: 255,
             },
         );
     }
@@ -219,8 +269,9 @@ impl Game {
             .expect("player does not have coord")
     }
 
-    // Move the player character one cell in the given direction
-    pub fn move_player(&mut self, direction: CardinalDirection) {
+    // Try to the player character one cell in the given direction. This may fail, or cause an
+    // alternative action to happen, such as opening or closing doors.
+    fn try_move_player(&mut self, direction: CardinalDirection) {
         let player_coord = self.get_player_coord();
         let new_player_coord = player_coord + direction.coord();
         if let Some(&Layers {
@@ -247,6 +298,19 @@ impl Game {
             .spatial_table
             .update_coord(self.player_entity, new_player_coord)
             .unwrap();
+    }
+
+    // Move the player character one cell in the given direction
+    pub fn move_player(&mut self, direction: CardinalDirection) {
+        self.try_move_player(direction);
+        self.update_visibility();
+    }
+
+    pub fn is_coord_visible(&self, coord: Coord) -> bool {
+        match self.visibility_grid.get_visibility(coord) {
+            CellVisibility::Current { .. } => true,
+            _ => false,
+        }
     }
 
     // Returns an iterator over rendering information for each renderable entity
