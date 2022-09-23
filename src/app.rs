@@ -1,9 +1,10 @@
-use crate::game::{EntityToRender, Game, Layer, Tile};
+use crate::game::{Game, Layer, Tile, VisibleCellData, VisibleEntityData};
 use gridbugs::{
     chargrid::{control_flow::*, prelude::*},
     coord_2d::Size,
     direction::CardinalDirection,
     rgb_int::Rgba32,
+    visible_area_detection::CellVisibility,
 };
 
 // An update to the game state
@@ -48,8 +49,8 @@ impl GameData {
     }
 
     // Associate each tile with a description of how to render it
-    fn render_cell_from_tile(&self, tile: Tile) -> RenderCell {
-        match tile {
+    fn render_cell_from_entity_data(&self, visible_entity_data: &VisibleEntityData) -> RenderCell {
+        match visible_entity_data.tile {
             Tile::Player => RenderCell::BLANK.with_character('@').with_bold(true),
             Tile::Wall => RenderCell::BLANK
                 .with_character('#')
@@ -77,12 +78,36 @@ impl GameData {
         }
     }
 
+    fn render_entity_data(
+        &self,
+        coord: Coord,
+        visible_entity_data: &VisibleEntityData,
+        layer: Layer,
+        ctx: Ctx,
+        fb: &mut FrameBuffer,
+    ) {
+        let render_cell = self.render_cell_from_entity_data(visible_entity_data);
+        let depth = Self::layer_depth(layer);
+        fb.set_cell_relative_to_ctx(ctx, coord, depth, render_cell);
+    }
+
+    fn render_cell(&self, coord: Coord, cell: &VisibleCellData, ctx: Ctx, fb: &mut FrameBuffer) {
+        cell.entity_data
+            .option_for_each_enumerate(|visible_entity_data, layer| {
+                self.render_entity_data(coord, visible_entity_data, layer, ctx, fb);
+            });
+    }
+
     fn render(&self, ctx: Ctx, fb: &mut FrameBuffer) {
-        for EntityToRender { coord, tile, layer } in self.game.entities_to_render() {
-            if self.game.is_coord_visible(coord) {
-                let render_cell = self.render_cell_from_tile(tile);
-                let depth = Self::layer_depth(layer);
-                fb.set_cell_relative_to_ctx(ctx, coord, depth, render_cell);
+        for (coord, visibility) in self.game.enumerate_cell_visibility() {
+            match visibility {
+                CellVisibility::Never => (),
+                CellVisibility::Previous(data) => {
+                    let dim_ctx =
+                        ctx.with_tint(&|colour: Rgba32| colour.saturating_scalar_mul_div(1, 3));
+                    self.render_cell(coord, data, dim_ctx, fb);
+                }
+                CellVisibility::Current { data, .. } => self.render_cell(coord, data, ctx, fb),
             }
         }
     }

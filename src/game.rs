@@ -52,7 +52,7 @@ spatial_table::declare_layers_module! {
 }
 
 pub use layers::Layer;
-use layers::Layers;
+use layers::{LayerTable, Layers};
 type SpatialTable = spatial_table::SpatialTable<Layers>;
 type Location = spatial_table::Location<Layer>;
 
@@ -166,11 +166,23 @@ impl VisibleWorld for World {
     }
 }
 
-// Information needed to render an entity
-pub struct EntityToRender {
-    pub coord: Coord,
+pub struct VisibleEntityData {
     pub tile: Tile,
-    pub layer: Layer,
+}
+
+#[derive(Default)]
+pub struct VisibleCellData {
+    pub entity_data: LayerTable<Option<VisibleEntityData>>,
+}
+
+impl VisibleCellData {
+    fn update(&mut self, world: &World, coord: Coord) {
+        let layers = world.spatial_table.layers_at_checked(coord);
+        self.entity_data = layers.option_and_then(|&entity| {
+            let maybe_tile = world.components.tile.get(entity).cloned();
+            maybe_tile.map(|tile| VisibleEntityData { tile })
+        });
+    }
 }
 
 // Level representation produced by terrain generation
@@ -210,7 +222,7 @@ impl Terrain {
 pub struct Game {
     world: World,
     player_entity: Entity,
-    visibility_grid: VisibilityGrid,
+    visibility_grid: VisibilityGrid<VisibleCellData>,
 }
 
 impl Game {
@@ -231,11 +243,12 @@ impl Game {
 
     fn update_visibility(&mut self) {
         let player_coord = self.get_player_coord();
-        self.visibility_grid.update(
+        self.visibility_grid.update_custom(
             Rgb24::new_grey(255),
             &self.world,
             PLAYER_VISION_DISTANCE,
             player_coord,
+            |data, coord| data.update(&self.world, coord),
         );
     }
 
@@ -325,29 +338,11 @@ impl Game {
         self.update_visibility();
     }
 
-    pub fn is_coord_visible(&self, coord: Coord) -> bool {
-        match self.visibility_grid.get_visibility(coord) {
-            CellVisibility::Current { .. } => true,
-            _ => false,
-        }
-    }
-
-    // Returns an iterator over rendering information for each renderable entity
-    pub fn entities_to_render(&self) -> impl '_ + Iterator<Item = EntityToRender> {
-        self.world
-            .components
-            .tile
-            .iter()
-            .filter_map(|(entity, &tile)| {
-                if let Some(&Location {
-                    coord,
-                    layer: Some(layer),
-                }) = self.world.spatial_table.location_of(entity)
-                {
-                    Some(EntityToRender { tile, coord, layer })
-                } else {
-                    None
-                }
-            })
+    // Returns an iterator over each coordinate of the world, along with the visibility of each
+    // corresponding cell
+    pub fn enumerate_cell_visibility(
+        &self,
+    ) -> impl Iterator<Item = (Coord, CellVisibility<&VisibleCellData>)> {
+        self.visibility_grid.enumerate()
     }
 }
