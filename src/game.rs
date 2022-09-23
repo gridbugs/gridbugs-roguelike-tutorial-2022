@@ -1,14 +1,22 @@
 use gridbugs::{
     coord_2d::{Coord, Size},
     direction::CardinalDirection,
-    entity_table::{self, entity_data, Entity, EntityAllocator},
+    entity_table::{self, entity_data, entity_update, Entity, EntityAllocator},
     spatial_table,
 };
+
+#[derive(Clone, Copy, Debug)]
+pub enum DoorState {
+    Open,
+    Closed,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum Tile {
     Player,
     Wall,
+    DoorOpen,
+    DoorClosed,
 }
 
 // Generates the type for a database storing entities. Each field is a table which maps an `Entity`
@@ -24,9 +32,10 @@ entity_table::declare_entity_module! {
     components {
         tile: Tile,
         solid: (),
+        door_state: DoorState,
     }
 }
-use components::{Components, EntityData};
+use components::{Components, EntityData, EntityUpdate};
 
 spatial_table::declare_layers_module! {
     layers {
@@ -88,6 +97,28 @@ impl World {
             },
         );
     }
+
+    pub fn spawn_door(&mut self, coord: Coord) {
+        // Remove any existing feautures (e.g. walls) at this location
+        if let &Layers {
+            feature: Some(feature_entity),
+            ..
+        } = self.spatial_table.layers_at_checked(coord)
+        {
+            self.spatial_table.remove(feature_entity);
+            self.components.remove_entity(feature_entity);
+            self.entity_allocator.free(feature_entity);
+        }
+        // Add the door
+        self.spawn_entity(
+            (coord, Layer::Feature),
+            entity_data! {
+                tile: Tile::DoorClosed,
+                door_state: DoorState::Closed,
+                solid: (),
+            },
+        );
+    }
 }
 
 // Information needed to render an entity
@@ -118,7 +149,22 @@ impl Game {
             let coord = centre + Coord::new(i - 5, 5);
             world.spawn_wall(coord);
         }
-        Self { world, player_entity }
+        world.spawn_door(centre + Coord::new(5, 0));
+        Self {
+            world,
+            player_entity,
+        }
+    }
+
+    fn open_door(&mut self, entity: Entity) {
+        self.world.components.apply_entity_update(
+            entity,
+            entity_update! {
+                door_state: Some(DoorState::Open),
+                tile: Some(Tile::DoorOpen),
+                solid: None,
+            },
+        );
     }
 
     // Returns the coordinate of the player character
@@ -138,6 +184,11 @@ impl Game {
             ..
         }) = self.world.spatial_table.layers_at(new_player_coord)
         {
+            // If the player bumps into a door, open the door
+            if let Some(DoorState::Closed) = self.world.components.door_state.get(feature_entity) {
+                self.open_door(feature_entity);
+                return;
+            }
             // Don't let the player walk through solid entities
             if self.world.components.solid.contains(feature_entity) {
                 return;

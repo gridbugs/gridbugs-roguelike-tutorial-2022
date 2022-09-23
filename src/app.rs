@@ -55,6 +55,14 @@ impl GameData {
                 .with_character('#')
                 .with_background(Rgba32::new_grey(255))
                 .with_foreground(Rgba32::new_grey(0)),
+            Tile::DoorClosed => RenderCell::BLANK
+                .with_character('+')
+                .with_background(Rgba32::new_grey(127))
+                .with_foreground(Rgba32::new_grey(255)),
+            Tile::DoorOpen => RenderCell::BLANK
+                .with_character('-')
+                .with_background(Rgba32::new_grey(127))
+                .with_foreground(Rgba32::new_grey(255)),
         }
     }
 
