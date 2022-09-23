@@ -877,6 +877,7 @@ dependencies = [
  "direction",
  "entity_table",
  "rgb_int",
+ "spatial_table",
 ]
 
 [[package]]
@@ -1646,6 +1647,16 @@ dependencies = [
  "wayland-client",
  "wayland-cursor",
  "wayland-protocols",
+]
+
+[[package]]
+name = "spatial_table"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f888a034a6e7f071b7e1efa233aa923d2c08bd534450f4c578c6ef795a14eb28"
+dependencies = [
+ "entity_table",
+ "grid_2d",
 ]
 
 [[package]]

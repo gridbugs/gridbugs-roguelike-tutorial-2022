@@ -13,6 +13,7 @@ features = [
     "coord_2d",
     "direction",
     "entity_table",
+    "spatial_table",
     "rgb_int",
 ]
 
