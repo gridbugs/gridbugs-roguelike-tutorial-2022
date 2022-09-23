@@ -1,6 +1,6 @@
 use gridbugs::{
     coord_2d::{Coord, Size},
-    direction::CardinalDirection,
+    direction::{CardinalDirection, Direction},
     entity_table::{self, entity_data, entity_update, Entity, EntityAllocator},
     spatial_table,
 };
@@ -169,6 +169,34 @@ impl Game {
         );
     }
 
+    fn close_door(&mut self, entity: Entity) {
+        self.world.components.insert_entity_data(
+            entity,
+            entity_data! {
+                door_state: DoorState::Closed,
+                tile: Tile::DoorClosed,
+                solid: (),
+            },
+        );
+    }
+
+    fn open_door_entity_adjacent_to_coord(&self, coord: Coord) -> Option<Entity> {
+        for direction in Direction::all() {
+            let potential_door_coord = coord + direction.coord();
+            if let Some(&Layers {
+                feature: Some(feature_entity),
+                ..
+            }) = self.world.spatial_table.layers_at(potential_door_coord)
+            {
+                if let Some(DoorState::Open) = self.world.components.door_state.get(feature_entity)
+                {
+                    return Some(feature_entity);
+                }
+            }
+        }
+        None
+    }
+
     // Returns the coordinate of the player character
     fn get_player_coord(&self) -> Coord {
         self.world
@@ -193,6 +221,11 @@ impl Game {
             }
             // Don't let the player walk through solid entities
             if self.world.components.solid.contains(feature_entity) {
+                if let Some(open_door_entity) =
+                    self.open_door_entity_adjacent_to_coord(player_coord)
+                {
+                    self.close_door(open_door_entity);
+                }
                 return;
             }
         }
