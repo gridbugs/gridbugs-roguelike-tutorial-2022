@@ -17,6 +17,7 @@ pub enum Tile {
     Wall,
     DoorOpen,
     DoorClosed,
+    Floor,
 }
 
 // Generates the type for a database storing entities. Each field is a table which maps an `Entity`
@@ -41,6 +42,7 @@ spatial_table::declare_layers_module! {
     layers {
         character: Character,
         feature: Feature,
+        floor: Floor,
     }
 }
 
@@ -120,6 +122,15 @@ impl World {
             },
         );
     }
+
+    pub fn spawn_floor(&mut self, coord: Coord) {
+        self.spawn_entity(
+            (coord, Layer::Floor),
+            entity_data! {
+                tile: Tile::Floor,
+            },
+        );
+    }
 }
 
 // Information needed to render an entity
@@ -152,6 +163,9 @@ impl Game {
             world.spawn_wall(coord);
         }
         world.spawn_door(centre + Coord::new(5, 0));
+        for coord in world_size.coord_iter_row_major() {
+            world.spawn_floor(coord);
+        }
         Self {
             world,
             player_entity,

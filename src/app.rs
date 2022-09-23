@@ -63,13 +63,17 @@ impl GameData {
                 .with_character('-')
                 .with_background(Rgba32::new_grey(127))
                 .with_foreground(Rgba32::new_grey(255)),
+            Tile::Floor => RenderCell::BLANK
+                .with_character('.')
+                .with_foreground(Rgba32::new_grey(127)),
         }
     }
 
     fn layer_depth(layer: Layer) -> i8 {
         match layer {
-            Layer::Character => 1,
-            Layer::Feature => 0,
+            Layer::Character => 2,
+            Layer::Feature => 1,
+            Layer::Floor => 0,
         }
     }
 
