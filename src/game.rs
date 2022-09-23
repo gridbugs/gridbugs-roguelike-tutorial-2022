@@ -7,6 +7,7 @@ use gridbugs::{
 #[derive(Clone, Copy, Debug)]
 pub enum Tile {
     Player,
+    Wall,
 }
 
 // Generates the type for a database storing entities. Each field is a table which maps an `Entity`
@@ -22,6 +23,7 @@ entity_table::declare_entity_module! {
     components {
         coord: Coord,
         tile: Tile,
+        solid: (),
     }
 }
 use components::Components;
@@ -40,6 +42,13 @@ impl World {
         self.components.coord.insert(entity, coord);
         self.components.tile.insert(entity, Tile::Player);
         entity
+    }
+
+    pub fn spawn_wall(&mut self, coord: Coord) {
+        let entity = self.entity_allocator.alloc();
+        self.components.coord.insert(entity, coord);
+        self.components.tile.insert(entity, Tile::Wall);
+        self.components.solid.insert(entity, ());
     }
 }
 
@@ -62,6 +71,16 @@ impl Game {
         let centre = world_size.to_coord().unwrap() / 2;
         // The player starts in the centre of the screen
         let player_entity = world.spawn_player(centre);
+        // Make a vertical section of wall to the east of the player
+        for i in 0..=10 {
+            let coord = centre + Coord::new(5, i - 5);
+            world.spawn_wall(coord);
+        }
+        // Make a horizontal section of wall to the south of the player
+        for i in 0..=10 {
+            let coord = centre + Coord::new(i - 5, 5);
+            world.spawn_wall(coord);
+        }
         Self {
             world,
             player_entity,
@@ -85,6 +104,14 @@ impl Game {
         let new_player_coord = player_coord + direction.coord();
         // Don't let the player walk off the screen
         if new_player_coord.is_valid(self.world_size) {
+            // Don't let the player walk through solid entities
+            for solid_entity in self.world.components.solid.entities() {
+                if let Some(&solid_coord) = self.world.components.coord.get(solid_entity) {
+                    if new_player_coord == solid_coord {
+                        return;
+                    }
+                }
+            }
             self.world
                 .components
                 .coord

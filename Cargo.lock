@@ -876,6 +876,7 @@ dependencies = [
  "coord_2d",
  "direction",
  "entity_table",
+ "rgb_int",
 ]
 
 [[package]]

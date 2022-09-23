@@ -3,6 +3,7 @@ use gridbugs::{
     chargrid::{control_flow::*, prelude::*},
     coord_2d::Size,
     direction::CardinalDirection,
+    rgb_int::Rgba32,
 };
 
 // An update to the game state
@@ -50,6 +51,10 @@ impl GameData {
     fn render_cell_from_tile(&self, tile: Tile) -> RenderCell {
         match tile {
             Tile::Player => RenderCell::BLANK.with_character('@').with_bold(true),
+            Tile::Wall => RenderCell::BLANK
+                .with_character('#')
+                .with_background(Rgba32::new_grey(255))
+                .with_foreground(Rgba32::new_grey(0)),
         }
     }
 
