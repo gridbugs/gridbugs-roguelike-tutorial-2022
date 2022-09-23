@@ -240,15 +240,20 @@ impl Terrain {
     }
 }
 
+pub struct Config {
+    pub omniscient: bool,
+}
+
 // The state of the game
 pub struct Game {
     world: World,
     player_entity: Entity,
     visibility_grid: VisibilityGrid<VisibleCellData>,
+    config: Config,
 }
 
 impl Game {
-    pub fn new(world_size: Size) -> Self {
+    pub fn new(world_size: Size, config: Config) -> Self {
         let Terrain {
             world,
             player_entity,
@@ -258,20 +263,31 @@ impl Game {
             world,
             player_entity,
             visibility_grid,
+            config,
         };
         self_.update_visibility();
         self_
     }
 
     fn update_visibility(&mut self) {
-        let player_coord = self.get_player_coord();
-        self.visibility_grid.update_custom(
-            Rgb24::new_grey(0),
-            &self.world,
-            PLAYER_VISION_DISTANCE,
-            player_coord,
-            |data, coord| data.update(&self.world, coord),
-        );
+        let update_fn = |data: &mut VisibleCellData, coord| data.update(&self.world, coord);
+
+        if self.config.omniscient {
+            self.visibility_grid.update_omniscient_custom(
+                Rgb24::new_grey(255),
+                &self.world,
+                update_fn,
+            );
+        } else {
+            let player_coord = self.get_player_coord();
+            self.visibility_grid.update_custom(
+                Rgb24::new_grey(0),
+                &self.world,
+                PLAYER_VISION_DISTANCE,
+                player_coord,
+                update_fn,
+            );
+        }
     }
 
     fn open_door(&mut self, entity: Entity) {

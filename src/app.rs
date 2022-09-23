@@ -1,4 +1,4 @@
-use crate::game::{Game, Layer, Tile, VisibleCellData, VisibleEntityData};
+use crate::game::{Config, Game, Layer, Tile, VisibleCellData, VisibleEntityData};
 use gridbugs::{
     chargrid::{control_flow::*, prelude::*},
     coord_2d::Size,
@@ -51,8 +51,8 @@ struct GameData {
 }
 
 impl GameData {
-    fn new(screen_size: Size) -> Self {
-        let game = Game::new(screen_size);
+    fn new(screen_size: Size, config: Config) -> Self {
+        let game = Game::new(screen_size, config);
         Self { game }
     }
 
@@ -178,10 +178,10 @@ impl Component for GameComponent {
     }
 }
 
-pub fn app() -> App {
+pub fn app(config: Config) -> App {
     // Instantiate the game state
     let screen_size = Size::new(60, 45);
-    let game_data = GameData::new(screen_size);
+    let game_data = GameData::new(screen_size, config);
     cf(GameComponent)
         .ignore_output() // Coerce the component's output type to `app::Output`.
         .with_state(game_data) // Associate the game state with the component.

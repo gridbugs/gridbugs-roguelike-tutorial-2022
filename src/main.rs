@@ -6,6 +6,7 @@ mod game;
 // Command-line arguments
 struct Args {
     terminal: bool,
+    omniscient: bool,
 }
 
 impl Args {
@@ -13,8 +14,9 @@ impl Args {
         meap::let_map! {
             let {
                 terminal = flag("terminal").desc("run in a terminal");
+                omniscient = flag("omniscient").desc("give the player omniscient vision");
             } in {
-                Self { terminal }
+                Self { terminal, omniscient }
             }
         }
     }
@@ -51,8 +53,12 @@ fn wgpu_context() -> chargrid_wgpu::Context {
 
 fn main() {
     use meap::Parser;
-    let Args { terminal } = Args::parser().with_help_default().parse_env_or_exit();
-    let app = app::app();
+    let Args {
+        terminal,
+        omniscient,
+    } = Args::parser().with_help_default().parse_env_or_exit();
+    let config = game::Config { omniscient };
+    let app = app::app(config);
     if terminal {
         // Run the app in an ANSI terminal chargrid context
         use chargrid_ansi_terminal::{Context, FromTermInfoRgb};
