@@ -100,7 +100,6 @@ pub struct EntityToRender {
 pub struct Game {
     world: World,
     player_entity: Entity,
-    world_size: Size,
 }
 
 impl Game {
@@ -119,11 +118,7 @@ impl Game {
             let coord = centre + Coord::new(i - 5, 5);
             world.spawn_wall(coord);
         }
-        Self {
-            world,
-            player_entity,
-            world_size,
-        }
+        Self { world, player_entity }
     }
 
     // Returns the coordinate of the player character
@@ -138,21 +133,20 @@ impl Game {
     pub fn move_player(&mut self, direction: CardinalDirection) {
         let player_coord = self.get_player_coord();
         let new_player_coord = player_coord + direction.coord();
-        // Don't let the player walk off the screen
-        if new_player_coord.is_valid(self.world_size) {
+        if let Some(&Layers {
+            feature: Some(feature_entity),
+            ..
+        }) = self.world.spatial_table.layers_at(new_player_coord)
+        {
             // Don't let the player walk through solid entities
-            for solid_entity in self.world.components.solid.entities() {
-                if let Some(solid_coord) = self.world.spatial_table.coord_of(solid_entity) {
-                    if new_player_coord == solid_coord {
-                        return;
-                    }
-                }
+            if self.world.components.solid.contains(feature_entity) {
+                return;
             }
-            self.world
-                .spatial_table
-                .update_coord(self.player_entity, new_player_coord)
-                .unwrap();
         }
+        self.world
+            .spatial_table
+            .update_coord(self.player_entity, new_player_coord)
+            .unwrap();
     }
 
     // Returns an iterator over rendering information for each renderable entity
