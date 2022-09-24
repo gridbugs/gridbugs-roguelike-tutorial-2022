@@ -20,3 +20,5 @@ features = [
 
 [dependencies]
 meap = "0.5"
+rand = "0.8"
+rand_isaac = "0.3"

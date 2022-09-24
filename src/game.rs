@@ -8,6 +8,8 @@ use gridbugs::{
         vision_distance, CellVisibility, Light, Rational, VisibilityGrid, World as VisibleWorld,
     },
 };
+use rand::{Rng, SeedableRng};
+use rand_isaac::Isaac64Rng;
 
 #[derive(Clone, Copy, Debug)]
 pub enum DoorState {
@@ -214,11 +216,14 @@ struct Terrain {
 }
 
 impl Terrain {
-    fn generate(world_size: Size) -> Self {
+    fn generate<R: Rng>(world_size: Size, rng: &mut R) -> Self {
         let mut world = World::new(world_size);
         let centre = world_size.to_coord().unwrap() / 2;
         // The player starts in the centre of the screen
-        let player_entity = world.spawn_player(centre);
+        let player_entity = world.spawn_player(Coord {
+            x: rng.gen_range(0..world_size.width() as i32),
+            y: rng.gen_range(0..world_size.height() as i32),
+        });
         // Make a vertical section of wall to the east of the player
         for i in 0..=10 {
             let coord = centre + Coord::new(5, i - 5);
@@ -242,6 +247,14 @@ impl Terrain {
 
 pub struct Config {
     pub omniscient: bool,
+    pub rng_seed: Option<u64>,
+}
+
+// Initialize a random number generator from a given seed, printing out the seed to help with
+// debugging
+fn rng_from_seed(seed: u64) -> Isaac64Rng {
+    println!("Seed: {}", seed);
+    Isaac64Rng::seed_from_u64(seed)
 }
 
 // The state of the game
@@ -250,23 +263,47 @@ pub struct Game {
     player_entity: Entity,
     visibility_grid: VisibilityGrid<VisibleCellData>,
     config: Config,
+    rng: Isaac64Rng,
 }
 
 impl Game {
     pub fn new(world_size: Size, config: Config) -> Self {
+        let seed = match config.rng_seed {
+            None => {
+                let mut rng = Isaac64Rng::from_entropy();
+                rng.gen()
+            }
+            Some(seed) => seed,
+        };
+        let mut rng = rng_from_seed(seed);
         let Terrain {
             world,
             player_entity,
-        } = Terrain::generate(world_size);
+        } = Terrain::generate(world_size, &mut rng);
         let visibility_grid = VisibilityGrid::new(world_size);
         let mut self_ = Self {
             world,
             player_entity,
             visibility_grid,
             config,
+            rng,
         };
         self_.update_visibility();
         self_
+    }
+
+    pub fn reset(&mut self) {
+        self.rng = rng_from_seed(self.rng.gen());
+        let world_size = self.world.spatial_table.grid_size();
+        let Terrain {
+            world,
+            player_entity,
+        } = Terrain::generate(world_size, &mut self.rng);
+        let visibility_grid = VisibilityGrid::new(world_size);
+        self.world = world;
+        self.player_entity = player_entity;
+        self.visibility_grid = visibility_grid;
+        self.update_visibility();
     }
 
     fn update_visibility(&mut self) {

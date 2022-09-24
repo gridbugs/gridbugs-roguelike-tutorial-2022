@@ -7,6 +7,7 @@ mod game;
 struct Args {
     terminal: bool,
     omniscient: bool,
+    rng_seed: Option<u64>,
 }
 
 impl Args {
@@ -15,8 +16,13 @@ impl Args {
             let {
                 terminal = flag("terminal").desc("run in a terminal");
                 omniscient = flag("omniscient").desc("give the player omniscient vision");
+                rng_seed = opt_opt::<u64, _>("INT", "rng-seed").desc("rng seed");
             } in {
-                Self { terminal, omniscient }
+                Self {
+                    terminal,
+                    omniscient,
+                    rng_seed,
+                }
             }
         }
     }
@@ -56,8 +62,12 @@ fn main() {
     let Args {
         terminal,
         omniscient,
+        rng_seed,
     } = Args::parser().with_help_default().parse_env_or_exit();
-    let config = game::Config { omniscient };
+    let config = game::Config {
+        omniscient,
+        rng_seed,
+    };
     let app = app::app(config);
     if terminal {
         // Run the app in an ANSI terminal chargrid context

@@ -166,6 +166,9 @@ impl Component for GameComponent {
 
     fn update(&mut self, state: &mut Self::State, _ctx: Ctx, event: Event) -> Self::Output {
         if let Event::Input(input) = event {
+            if let Some(KeyboardInput::Char('r')) = input.keyboard() {
+                state.game.reset();
+            }
             if let Some(game_action) = game_action_from_input(input) {
                 state.handle_game_action(game_action);
             }
