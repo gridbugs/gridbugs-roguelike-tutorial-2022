@@ -17,6 +17,7 @@ features = [
     "rgb_int",
     "visible_area_detection",
     "grid_2d",
+    "perlin2",
 ]
 
 [dependencies]

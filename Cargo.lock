@@ -877,6 +877,7 @@ dependencies = [
  "direction",
  "entity_table",
  "grid_2d",
+ "perlin2",
  "rgb_int",
  "spatial_table",
  "visible_area_detection",
@@ -1337,6 +1338,15 @@ name = "percent-encoding"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
+
+[[package]]
+name = "perlin2"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe5b5a5975b7b26d0fcabd70b04b5c75f6ecc8847fb7a8261704bcc5bb99f9b9"
+dependencies = [
+ "rand",
+]
 
 [[package]]
 name = "petgraph"

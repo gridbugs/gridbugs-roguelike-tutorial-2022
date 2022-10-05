@@ -111,6 +111,12 @@ impl GameData {
             Tile::CaveFloor => RenderCell::BLANK
                 .with_character('.')
                 .with_foreground(Rgba32::new_rgb(125, 82, 44)),
+            Tile::Grass => RenderCell::BLANK
+                .with_character('"')
+                .with_foreground(Rgba32::new_rgb(0, 187, 63)),
+            Tile::GrassCrushed => RenderCell::BLANK
+                .with_character('\'')
+                .with_foreground(Rgba32::new_rgb(0, 127, 63)),
         }
     }
 

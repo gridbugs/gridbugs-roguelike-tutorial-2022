@@ -19,6 +19,12 @@ pub enum DoorState {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub enum GrassState {
+    Normal,
+    Crushed,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum Tile {
     Player,
     Wall,
@@ -27,6 +33,8 @@ pub enum Tile {
     Floor,
     CaveWall,
     CaveFloor,
+    Grass,
+    GrassCrushed,
 }
 
 impl Tile {
@@ -54,6 +62,7 @@ entity_table::declare_entity_module! {
         door_state: DoorState,
         opacity: u8,
         light: Light<vision_distance::Circle>,
+        grass_state: GrassState,
     }
 }
 use components::{Components, EntityData, EntityUpdate};
@@ -166,6 +175,17 @@ impl World {
             (coord, Layer::Floor),
             entity_data! {
                 tile: Tile::CaveFloor,
+            },
+        );
+    }
+
+    pub fn spawn_grass(&mut self, coord: Coord) {
+        self.spawn_entity(
+            (coord, Layer::Feature),
+            entity_data! {
+                tile: Tile::Grass,
+                opacity: 128,
+                grass_state: GrassState::Normal,
             },
         );
     }
@@ -327,6 +347,17 @@ impl Game {
         );
     }
 
+    fn crush_grass(&mut self, entity: Entity) {
+        self.world.components.insert_entity_data(
+            entity,
+            entity_data! {
+                grass_state: GrassState::Crushed,
+                tile: Tile::GrassCrushed,
+                opacity: 0,
+            },
+        );
+    }
+
     fn open_door_entity_adjacent_to_coord(&self, coord: Coord) -> Option<Entity> {
         for direction in Direction::all() {
             let potential_door_coord = coord + direction.coord();
@@ -375,6 +406,10 @@ impl Game {
                     self.close_door(open_door_entity);
                 }
                 return;
+            }
+            if let Some(GrassState::Normal) = self.world.components.grass_state.get(feature_entity)
+            {
+                self.crush_grass(feature_entity);
             }
         }
         self.world

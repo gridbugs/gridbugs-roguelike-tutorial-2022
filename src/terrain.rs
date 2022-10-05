@@ -4,6 +4,7 @@ use gridbugs::{
     direction::{CardinalDirection, Direction},
     entity_table::Entity,
     grid_2d::Grid,
+    perlin2::Perlin2,
 };
 use rand::{seq::SliceRandom, Rng};
 use std::{collections::HashSet, mem};
@@ -514,6 +515,19 @@ fn remove_invalid_doors(map: &mut Grid<LevelCell>) {
     }
 }
 
+// Returns a grid of booleans, where a true value indicates that grass can spawn at that location.
+// The grid is populated using perlin noise.
+fn make_grass_map<R: Rng>(size: Size, rng: &mut R) -> Grid<bool> {
+    let perlin = Perlin2::new(rng);
+    let zoom = 10.;
+    Grid::new_fn(size, |Coord { x, y }| {
+        let x = x as f64 / zoom;
+        let y = y as f64 / zoom;
+        let noise = perlin.noise((x, y));
+        noise > 0. && rng.gen::<f64>() > 0.5
+    })
+}
+
 // Level representation produced by terrain generation
 pub struct Terrain {
     pub world: World,
@@ -532,6 +546,7 @@ impl Terrain {
             combine_rooms_and_corridors_level_with_cave(&rooms_and_corridors_map, &cave_map);
         remove_unreachable_floor(&mut combined_map, player_spawn);
         remove_invalid_doors(&mut combined_map);
+        let grass_map = make_grass_map(world_size, rng);
         let player_entity = world.spawn_player(player_spawn);
         for (coord, &cell) in combined_map.enumerate() {
             use LevelCell::*;
@@ -539,7 +554,13 @@ impl Terrain {
                 Floor => world.spawn_floor(coord),
                 Wall => world.spawn_wall(coord),
                 Door => world.spawn_door(coord),
-                CaveFloor => world.spawn_cave_floor(coord),
+                CaveFloor => {
+                    world.spawn_cave_floor(coord);
+                    if *grass_map.get_checked(coord) {
+                        world.spawn_grass(coord);
+                    }
+                }
+
                 CaveWall => world.spawn_cave_wall(coord),
             }
         }
