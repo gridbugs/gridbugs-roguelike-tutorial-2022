@@ -1,12 +1,12 @@
 use crate::game::World;
 use gridbugs::{
     coord_2d::{Axis, Coord, Size},
-    direction::CardinalDirection,
+    direction::{CardinalDirection, Direction},
     entity_table::Entity,
     grid_2d::Grid,
 };
 use rand::{seq::SliceRandom, Rng};
-use std::collections::HashSet;
+use std::{collections::HashSet, mem};
 
 // Will be used as cells in grids representing simple maps of levels during terrain generation
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -274,6 +274,246 @@ impl RoomsAndCorridorsLevel {
     }
 }
 
+// Params for the Conway's Game of Life Cell Automata which will be used to generate caves
+struct GameOfLifeParams {
+    survive_min: u8,
+    survive_max: u8,
+    resurrect_min: u8,
+    resurrect_max: u8,
+}
+
+// State for the Conway's Game of Life Cell Automata which will be used to generate caves
+struct GameOfLife {
+    alive: Grid<bool>,
+    next: Grid<bool>,
+}
+
+impl GameOfLife {
+    // Initialize state to random values
+    fn new<R: Rng>(size: Size, rng: &mut R) -> Self {
+        let alive = Grid::new_fn(size, |_| rng.gen::<bool>());
+        let next = Grid::new_default(size);
+        Self { alive, next }
+    }
+
+    // Progress the cell automata simulation by one step
+    fn step(
+        &mut self,
+        &GameOfLifeParams {
+            survive_min,
+            survive_max,
+            resurrect_min,
+            resurrect_max,
+        }: &GameOfLifeParams,
+    ) {
+        for ((coord, &alive_cell), next_cell) in self.alive.enumerate().zip(self.next.iter_mut()) {
+            let n: u8 = Direction::all()
+                .map(|direction| {
+                    self.alive
+                        .get(coord + direction.coord())
+                        .cloned()
+                        .unwrap_or(false) as u8
+                })
+                .sum();
+            *next_cell = (alive_cell && n >= survive_min && n <= survive_max)
+                || (!alive_cell && n >= resurrect_min && n <= resurrect_max);
+        }
+        mem::swap(&mut self.alive, &mut self.next);
+    }
+}
+
+// Generate the starting point for the cave map by running a cell automata for several steps
+fn generate_initial_cave_map<R: Rng>(size: Size, rng: &mut R) -> Grid<FloorOrWall> {
+    const NUM_STEPS: usize = 10;
+    let mut game_of_life = GameOfLife::new(size, rng);
+    // This choice of params leads to cavernous regions of living cells
+    let params = GameOfLifeParams {
+        survive_min: 4,
+        survive_max: 8,
+        resurrect_min: 5,
+        resurrect_max: 5,
+    };
+    for _ in 0..NUM_STEPS {
+        game_of_life.step(&params);
+    }
+    Grid::new_grid_map(game_of_life.alive, |alive| {
+        if alive {
+            FloorOrWall::Floor
+        } else {
+            FloorOrWall::Wall
+        }
+    })
+}
+
+// Place walls at every point along the outside of a map
+fn surround_map_with_walls(map: &mut Grid<FloorOrWall>) {
+    let Coord {
+        x: width,
+        y: height,
+    } = map.size().to_coord().unwrap();
+    for (Coord { x, y }, cell) in map.enumerate_mut() {
+        if x == 0 || y == 0 || x == width - 1 || y == height - 1 {
+            *cell = FloorOrWall::Wall;
+        }
+    }
+}
+
+// Remove clumps of wall cells which aren't connected to the edge of the map by walls (replacing
+// them with floor cells)
+fn remove_disconnected_walls(map: &mut Grid<FloorOrWall>) {
+    assert!(
+        *map.get_checked(Coord::new(0, 0)) == FloorOrWall::Wall,
+        "top-left cell must be wall"
+    );
+    // Flood-fill all the wall cells starting with the top-left
+    let mut walls_to_visit = vec![Coord::new(0, 0)];
+    let mut seen = Grid::new_copy(map.size(), false);
+    *seen.get_checked_mut(Coord::new(0, 0)) = true;
+    while let Some(coord) = walls_to_visit.pop() {
+        for neighbour_coord in CardinalDirection::all().map(|d| coord + d.coord()) {
+            if let Some(FloorOrWall::Wall) = map.get(neighbour_coord) {
+                let seen = seen.get_checked_mut(neighbour_coord);
+                if !*seen {
+                    *seen = true;
+                    walls_to_visit.push(neighbour_coord);
+                }
+            }
+        }
+    }
+    // Update the map, marking all unseen cells as floor
+    for (cell_mut, &seen) in map.iter_mut().zip(seen.iter()) {
+        if !seen {
+            *cell_mut = FloorOrWall::Floor;
+        }
+    }
+}
+
+// Returns a grid of cells defining a cave map
+fn generate_cave_map<R: Rng>(size: Size, rng: &mut R) -> Grid<FloorOrWall> {
+    let mut map = generate_initial_cave_map(size, rng);
+    surround_map_with_walls(&mut map);
+    remove_disconnected_walls(&mut map);
+    map
+}
+
+// A cell of the game world
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LevelCell {
+    Floor,
+    Wall,
+    Door,
+    CaveFloor,
+    CaveWall,
+}
+
+impl LevelCell {
+    fn is_wall(&self) -> bool {
+        match self {
+            Self::Wall | Self::CaveWall => true,
+            _ => false,
+        }
+    }
+
+    fn is_floor(&self) -> bool {
+        match self {
+            Self::Floor | Self::CaveFloor => true,
+            _ => false,
+        }
+    }
+}
+
+// Returns true iff a given coordinate is entirely surrounded by walls
+fn is_surrounded_by_walls(map: &Grid<RoomsAndCorridorsCell>, coord: Coord) -> bool {
+    Direction::all()
+        .filter_map(|direction| map.get(coord + direction.coord()))
+        .all(|&cell| cell == RoomsAndCorridorsCell::Wall)
+}
+
+// Combines a map of rooms and corridors with a cave map to produce a hybrid of the two
+fn combine_rooms_and_corridors_level_with_cave(
+    rooms_and_corridors_level_map: &Grid<RoomsAndCorridorsCell>,
+    cave_map: &Grid<FloorOrWall>,
+) -> Grid<LevelCell> {
+    Grid::new_fn(cave_map.size(), |coord| match cave_map.get_checked(coord) {
+        FloorOrWall::Floor => LevelCell::CaveFloor,
+        FloorOrWall::Wall => match rooms_and_corridors_level_map.get_checked(coord) {
+            RoomsAndCorridorsCell::Floor => LevelCell::Floor,
+            RoomsAndCorridorsCell::Door => LevelCell::Door,
+            RoomsAndCorridorsCell::Wall => {
+                if is_surrounded_by_walls(rooms_and_corridors_level_map, coord) {
+                    LevelCell::CaveWall
+                } else {
+                    LevelCell::Wall
+                }
+            }
+        },
+    })
+}
+
+// Updates a map, replacing all cells unreachable from the player spawn with cave walls
+fn remove_unreachable_floor(map: &mut Grid<LevelCell>, player_spawn: Coord) {
+    let mut seen = Grid::new_copy(map.size(), false);
+    *seen.get_checked_mut(player_spawn) = true;
+    let mut to_visit = vec![player_spawn];
+    while let Some(current) = to_visit.pop() {
+        for direction in CardinalDirection::all() {
+            let neighbour_coord = current + direction.coord();
+            if let Some(neighbour_cell) = map.get(neighbour_coord) {
+                if !neighbour_cell.is_wall() {
+                    let seen_cell = seen.get_checked_mut(neighbour_coord);
+                    if !*seen_cell {
+                        to_visit.push(neighbour_coord);
+                    }
+                    *seen_cell = true;
+                }
+            }
+        }
+    }
+    for (&seen_cell, map_cell) in seen.iter().zip(map.iter_mut()) {
+        if !seen_cell && *map_cell == LevelCell::CaveFloor {
+            *map_cell = LevelCell::CaveWall;
+        }
+    }
+}
+
+// Returns true iff a given coordinate is a valid door position with respect to a given axis. That
+// is, there is a floor cell on either side of the coordinate in the direction of the axis, and a
+// wall cell on either side of the coordinate in the direction of the other axis.
+fn is_valid_door_position_axis(map: &Grid<LevelCell>, coord: Coord, axis: Axis) -> bool {
+    let axis_delta = Coord::new_axis(1, 0, axis);
+    let other_axis_delta = Coord::new_axis(0, 1, axis);
+    let floor_in_axis = map.get_checked(coord + axis_delta).is_floor()
+        && map.get_checked(coord - axis_delta).is_floor();
+    let wall_in_other_axis = map.get_checked(coord + other_axis_delta).is_wall()
+        && map.get_checked(coord - other_axis_delta).is_wall();
+    floor_in_axis && wall_in_other_axis
+}
+
+// Returns true iff a given coordinate is a valid door position
+fn is_valid_door_position(map: &Grid<LevelCell>, coord: Coord) -> bool {
+    is_valid_door_position_axis(map, coord, Axis::X)
+        || is_valid_door_position_axis(map, coord, Axis::Y)
+}
+
+// Updates a map, replacing all door cells which aren't in valid positions with floor cells. A door
+// can be in an invalid position due to the effect of combining a room and corridor map with a cave
+// map.
+fn remove_invalid_doors(map: &mut Grid<LevelCell>) {
+    let to_remove = map
+        .enumerate()
+        .filter_map(|(coord, cell)| {
+            if *cell == LevelCell::Door && !is_valid_door_position(map, coord) {
+                Some(coord)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    for coord in to_remove {
+        *map.get_checked_mut(coord) = LevelCell::Floor;
+    }
+}
+
 // Level representation produced by terrain generation
 pub struct Terrain {
     pub world: World,
@@ -287,13 +527,20 @@ impl Terrain {
             map: rooms_and_corridors_map,
             player_spawn,
         } = RoomsAndCorridorsLevel::generate(world_size, rng);
+        let cave_map = generate_cave_map(world_size, rng);
+        let mut combined_map =
+            combine_rooms_and_corridors_level_with_cave(&rooms_and_corridors_map, &cave_map);
+        remove_unreachable_floor(&mut combined_map, player_spawn);
+        remove_invalid_doors(&mut combined_map);
         let player_entity = world.spawn_player(player_spawn);
-        for (coord, &cell) in rooms_and_corridors_map.enumerate() {
-            use RoomsAndCorridorsCell::*;
+        for (coord, &cell) in combined_map.enumerate() {
+            use LevelCell::*;
             match cell {
                 Floor => world.spawn_floor(coord),
                 Wall => world.spawn_wall(coord),
                 Door => world.spawn_door(coord),
+                CaveFloor => world.spawn_cave_floor(coord),
+                CaveWall => world.spawn_cave_wall(coord),
             }
         }
         Self {

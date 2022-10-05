@@ -84,6 +84,19 @@ impl GameData {
                         .with_foreground(Rgba32::new_grey(127))
                 }
             }
+            Tile::CaveWall => {
+                let is_wall_below = self.game.is_wall_known_at(coord + Coord::new(0, 1));
+                if is_wall_below {
+                    RenderCell::BLANK
+                        .with_character(' ')
+                        .with_background(Rgba32::new_rgb(125, 82, 44))
+                } else {
+                    RenderCell::BLANK
+                        .with_character('▄')
+                        .with_background(Rgba32::new_rgb(125, 82, 44))
+                        .with_foreground(Rgba32::new_rgb(68, 39, 14))
+                }
+            }
             Tile::DoorClosed => RenderCell::BLANK
                 .with_character('+')
                 .with_background(Rgba32::new_grey(127))
@@ -95,6 +108,9 @@ impl GameData {
             Tile::Floor => RenderCell::BLANK
                 .with_character('.')
                 .with_foreground(Rgba32::new_grey(127)),
+            Tile::CaveFloor => RenderCell::BLANK
+                .with_character('.')
+                .with_foreground(Rgba32::new_rgb(125, 82, 44)),
         }
     }
 

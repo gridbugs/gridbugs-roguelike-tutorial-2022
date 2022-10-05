@@ -25,12 +25,14 @@ pub enum Tile {
     DoorOpen,
     DoorClosed,
     Floor,
+    CaveWall,
+    CaveFloor,
 }
 
 impl Tile {
     pub fn is_wall(&self) -> bool {
         match self {
-            Self::Wall | Self::DoorClosed | Self::DoorOpen => true,
+            Self::Wall | Self::DoorClosed | Self::DoorOpen | Self::CaveWall => true,
             _ => false,
         }
     }
@@ -127,18 +129,18 @@ impl World {
         );
     }
 
+    pub fn spawn_cave_wall(&mut self, coord: Coord) {
+        self.spawn_entity(
+            (coord, Layer::Feature),
+            entity_data! {
+                tile: Tile::CaveWall,
+                solid: (),
+                opacity: 255,
+            },
+        );
+    }
+
     pub fn spawn_door(&mut self, coord: Coord) {
-        // Remove any existing feautures (e.g. walls) at this location
-        if let &Layers {
-            feature: Some(feature_entity),
-            ..
-        } = self.spatial_table.layers_at_checked(coord)
-        {
-            self.spatial_table.remove(feature_entity);
-            self.components.remove_entity(feature_entity);
-            self.entity_allocator.free(feature_entity);
-        }
-        // Add the door
         self.spawn_entity(
             (coord, Layer::Feature),
             entity_data! {
@@ -155,6 +157,15 @@ impl World {
             (coord, Layer::Floor),
             entity_data! {
                 tile: Tile::Floor,
+            },
+        );
+    }
+
+    pub fn spawn_cave_floor(&mut self, coord: Coord) {
+        self.spawn_entity(
+            (coord, Layer::Floor),
+            entity_data! {
+                tile: Tile::CaveFloor,
             },
         );
     }
