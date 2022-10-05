@@ -876,6 +876,7 @@ dependencies = [
  "coord_2d",
  "direction",
  "entity_table",
+ "grid_2d",
  "rgb_int",
  "spatial_table",
  "visible_area_detection",

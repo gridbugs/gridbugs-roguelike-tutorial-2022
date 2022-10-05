@@ -16,6 +16,7 @@ features = [
     "spatial_table",
     "rgb_int",
     "visible_area_detection",
+    "grid_2d",
 ]
 
 [dependencies]
