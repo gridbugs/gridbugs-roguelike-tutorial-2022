@@ -173,15 +173,14 @@ pub struct EntityToRender {
     pub layer: Layer,
 }
 
-// The state of the game
-pub struct Game {
+// Level representation produced by terrain generation
+struct Terrain {
     world: World,
     player_entity: Entity,
-    visibility_grid: VisibilityGrid,
 }
 
-impl Game {
-    pub fn new(world_size: Size) -> Self {
+impl Terrain {
+    fn generate(world_size: Size) -> Self {
         let mut world = World::new(world_size);
         let centre = world_size.to_coord().unwrap() / 2;
         // The player starts in the centre of the screen
@@ -200,6 +199,26 @@ impl Game {
         for coord in world_size.coord_iter_row_major() {
             world.spawn_floor(coord);
         }
+        Self {
+            world,
+            player_entity,
+        }
+    }
+}
+
+// The state of the game
+pub struct Game {
+    world: World,
+    player_entity: Entity,
+    visibility_grid: VisibilityGrid,
+}
+
+impl Game {
+    pub fn new(world_size: Size) -> Self {
+        let Terrain {
+            world,
+            player_entity,
+        } = Terrain::generate(world_size);
         let visibility_grid = VisibilityGrid::new(world_size);
         let mut self_ = Self {
             world,
