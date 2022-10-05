@@ -2,6 +2,7 @@ use gridbugs::{chargrid_ansi_terminal, chargrid_wgpu};
 
 mod app;
 mod game;
+mod terrain;
 
 // Command-line arguments
 struct Args {
