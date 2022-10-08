@@ -3,7 +3,7 @@ use gridbugs::{
     chargrid::{control_flow::*, prelude::*},
     coord_2d::Size,
     direction::CardinalDirection,
-    rgb_int::Rgba32,
+    rgb_int::{Rgb24, Rgba32},
     visible_area_detection::CellVisibility,
 };
 
@@ -27,6 +27,21 @@ fn game_action_from_input(input: Input) -> Option<GameAction> {
             }
         }
         _ => None,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct LightBlend {
+    light_colour: Rgb24,
+}
+
+impl Tint for LightBlend {
+    fn tint(&self, rgba32: Rgba32) -> Rgba32 {
+        rgba32
+            .to_rgb24()
+            .normalised_mul(self.light_colour)
+            .saturating_add(self.light_colour.saturating_scalar_mul_div(1, 10))
+            .to_rgba32(255)
     }
 }
 
@@ -102,12 +117,24 @@ impl GameData {
         for (coord, visibility) in self.game.enumerate_cell_visibility() {
             match visibility {
                 CellVisibility::Never => (),
-                CellVisibility::Previous(data) => {
-                    let dim_ctx =
-                        ctx.with_tint(&|colour: Rgba32| colour.saturating_scalar_mul_div(1, 3));
+                CellVisibility::Previous(data)
+                | CellVisibility::Current {
+                    data,
+                    light_colour: None,
+                } => {
+                    let dim_ctx = ctx.with_tint(&|colour: Rgba32| {
+                        Rgba32::new_grey(colour.to_rgb24().max_channel() / 3)
+                    });
                     self.render_cell(coord, data, dim_ctx, fb);
                 }
-                CellVisibility::Current { data, .. } => self.render_cell(coord, data, ctx, fb),
+                CellVisibility::Current {
+                    data,
+                    light_colour: Some(light_colour),
+                } => {
+                    let tint = LightBlend { light_colour };
+                    let blend_ctx = ctx.with_tint(&tint);
+                    self.render_cell(coord, data, blend_ctx, fb);
+                }
             }
         }
     }

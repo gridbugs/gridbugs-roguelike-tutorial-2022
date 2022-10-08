@@ -5,7 +5,7 @@ use gridbugs::{
     rgb_int::Rgb24,
     spatial_table,
     visible_area_detection::{
-        vision_distance, CellVisibility, VisibilityGrid, World as VisibleWorld,
+        vision_distance, CellVisibility, Light, Rational, VisibilityGrid, World as VisibleWorld,
     },
 };
 
@@ -39,6 +39,7 @@ entity_table::declare_entity_module! {
         solid: (),
         door_state: DoorState,
         opacity: u8,
+        light: Light<vision_distance::Circle>,
     }
 }
 use components::{Components, EntityData, EntityUpdate};
@@ -94,6 +95,11 @@ impl World {
             (coord, Layer::Character),
             entity_data! {
                 tile: Tile::Player,
+                light: Light {
+                    colour: Rgb24::new_grey(255),
+                    vision_distance: PLAYER_VISION_DISTANCE,
+                    diminish: Rational { numerator: 1, denominator: 150 },
+                }
             },
         )
     }
@@ -162,6 +168,13 @@ impl VisibleWorld for World {
                 .unwrap_or(0)
         } else {
             0
+        }
+    }
+    fn for_each_light_by_coord<F: FnMut(Coord, &Light<Self::VisionDistance>)>(&self, mut f: F) {
+        for (entity, light) in self.components.light.iter() {
+            if let Some(coord) = self.spatial_table.coord_of(entity) {
+                f(coord, light);
+            }
         }
     }
 }
@@ -244,7 +257,7 @@ impl Game {
     fn update_visibility(&mut self) {
         let player_coord = self.get_player_coord();
         self.visibility_grid.update_custom(
-            Rgb24::new_grey(255),
+            Rgb24::new_grey(0),
             &self.world,
             PLAYER_VISION_DISTANCE,
             player_coord,
