@@ -117,6 +117,10 @@ impl GameData {
             Tile::GrassCrushed => RenderCell::BLANK
                 .with_character('\'')
                 .with_foreground(Rgba32::new_rgb(0, 127, 63)),
+            Tile::Water => RenderCell::BLANK
+                .with_character('.')
+                .with_background(Rgba32::new_rgb(0, 63, 127))
+                .with_foreground(Rgba32::new_rgb(0, 127, 187)),
         }
     }
 

@@ -35,6 +35,7 @@ pub enum Tile {
     CaveFloor,
     Grass,
     GrassCrushed,
+    Water,
 }
 
 impl Tile {
@@ -175,6 +176,15 @@ impl World {
             (coord, Layer::Floor),
             entity_data! {
                 tile: Tile::CaveFloor,
+            },
+        );
+    }
+
+    pub fn spawn_water(&mut self, coord: Coord) {
+        self.spawn_entity(
+            (coord, Layer::Floor),
+            entity_data! {
+                tile: Tile::Water,
             },
         );
     }

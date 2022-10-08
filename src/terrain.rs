@@ -452,7 +452,11 @@ fn combine_rooms_and_corridors_level_with_cave(
 }
 
 // Updates a map, replacing all cells unreachable from the player spawn with cave walls
-fn remove_unreachable_floor(map: &mut Grid<LevelCell>, player_spawn: Coord) {
+fn remove_unreachable_floor(
+    map: &mut Grid<LevelCell>,
+    water_map: &mut Grid<bool>,
+    player_spawn: Coord,
+) {
     let mut seen = Grid::new_copy(map.size(), false);
     *seen.get_checked_mut(player_spawn) = true;
     let mut to_visit = vec![player_spawn];
@@ -460,7 +464,8 @@ fn remove_unreachable_floor(map: &mut Grid<LevelCell>, player_spawn: Coord) {
         for direction in CardinalDirection::all() {
             let neighbour_coord = current + direction.coord();
             if let Some(neighbour_cell) = map.get(neighbour_coord) {
-                if !neighbour_cell.is_wall() {
+                let water_cell = *water_map.get_checked(neighbour_coord);
+                if !neighbour_cell.is_wall() || water_cell {
                     let seen_cell = seen.get_checked_mut(neighbour_coord);
                     if !*seen_cell {
                         to_visit.push(neighbour_coord);
@@ -470,9 +475,14 @@ fn remove_unreachable_floor(map: &mut Grid<LevelCell>, player_spawn: Coord) {
             }
         }
     }
-    for (&seen_cell, map_cell) in seen.iter().zip(map.iter_mut()) {
-        if !seen_cell && *map_cell == LevelCell::CaveFloor {
-            *map_cell = LevelCell::CaveWall;
+    for ((&seen_cell, map_cell), water_cell) in
+        seen.iter().zip(map.iter_mut()).zip(water_map.iter_mut())
+    {
+        if !seen_cell {
+            *water_cell = false;
+            if *map_cell == LevelCell::CaveFloor {
+                *map_cell = LevelCell::CaveWall;
+            }
         }
     }
 }
@@ -528,6 +538,38 @@ fn make_grass_map<R: Rng>(size: Size, rng: &mut R) -> Grid<bool> {
     })
 }
 
+// Returns a grid of booleans, where a true value indicates that grass can spawn at that location.
+// The grid is populated using perlin noise.
+fn make_water_map<R: Rng>(size: Size, rng: &mut R) -> Grid<bool> {
+    let perlin = Perlin2::new(rng);
+    let zoom = 7.;
+    let mut map = Grid::new_fn(size, |Coord { x, y }| {
+        let x = x as f64 / zoom;
+        let y = y as f64 / zoom;
+        let noise = perlin.noise01((x, y));
+        noise > 0.65
+    });
+    let mut to_visit = map
+        .edge_enumerate()
+        .filter_map(|(coord, cell)| if *cell { Some(coord) } else { None })
+        .collect::<Vec<_>>();
+    let mut seen = to_visit.iter().cloned().collect::<HashSet<_>>();
+    while let Some(coord) = to_visit.pop() {
+        for direction in CardinalDirection::all() {
+            let neighbour_coord = coord + direction.coord();
+            if let Some(true) = map.get(neighbour_coord) {
+                if seen.insert(neighbour_coord) {
+                    to_visit.push(neighbour_coord);
+                }
+            }
+        }
+    }
+    for coord in seen {
+        *map.get_checked_mut(coord) = false;
+    }
+    map
+}
+
 // Level representation produced by terrain generation
 pub struct Terrain {
     pub world: World,
@@ -544,24 +586,43 @@ impl Terrain {
         let cave_map = generate_cave_map(world_size, rng);
         let mut combined_map =
             combine_rooms_and_corridors_level_with_cave(&rooms_and_corridors_map, &cave_map);
-        remove_unreachable_floor(&mut combined_map, player_spawn);
+        let mut water_map = make_water_map(world_size, rng);
+        remove_unreachable_floor(&mut combined_map, &mut water_map, player_spawn);
         remove_invalid_doors(&mut combined_map);
         let grass_map = make_grass_map(world_size, rng);
         let player_entity = world.spawn_player(player_spawn);
         for (coord, &cell) in combined_map.enumerate() {
             use LevelCell::*;
-            match cell {
-                Floor => world.spawn_floor(coord),
-                Wall => world.spawn_wall(coord),
-                Door => world.spawn_door(coord),
-                CaveFloor => {
-                    world.spawn_cave_floor(coord);
-                    if *grass_map.get_checked(coord) {
-                        world.spawn_grass(coord);
+            if *water_map.get_checked(coord) {
+                match cell {
+                    Floor | Door => world.spawn_water(coord),
+                    Wall => {
+                        if rng.gen_range(0..100) < 75 {
+                            world.spawn_wall(coord)
+                        } else {
+                            world.spawn_water(coord);
+                        }
+                    }
+                    CaveFloor | CaveWall => {
+                        world.spawn_water(coord);
+                        if *grass_map.get_checked(coord) {
+                            world.spawn_grass(coord);
+                        }
                     }
                 }
-
-                CaveWall => world.spawn_cave_wall(coord),
+            } else {
+                match cell {
+                    Floor => world.spawn_floor(coord),
+                    Wall => world.spawn_wall(coord),
+                    Door => world.spawn_door(coord),
+                    CaveFloor => {
+                        world.spawn_cave_floor(coord);
+                        if *grass_map.get_checked(coord) {
+                            world.spawn_grass(coord);
+                        }
+                    }
+                    CaveWall => world.spawn_cave_wall(coord),
+                }
             }
         }
         Self {
