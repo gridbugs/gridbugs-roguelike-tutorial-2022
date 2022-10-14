@@ -15,9 +15,11 @@ features = [
     "entity_table",
     "spatial_table",
     "rgb_int",
+    "rgb_int_rand",
     "visible_area_detection",
     "grid_2d",
     "perlin2",
+    "entity_table_realtime",
 ]
 
 [dependencies]

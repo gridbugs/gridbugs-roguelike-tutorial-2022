@@ -1,8 +1,12 @@
-use crate::terrain::Terrain;
+use crate::{
+    realtime::{types as realtime_types, RealtimeComponents, RealtimeContext},
+    terrain::Terrain,
+};
 use gridbugs::{
     coord_2d::{Coord, Size},
     direction::{CardinalDirection, Direction},
-    entity_table::{self, entity_data, entity_update, Entity, EntityAllocator},
+    entity_table::{self, entity_data, entity_update, Entities, Entity, EntityAllocator},
+    entity_table_realtime::AnimationContext,
     rgb_int::Rgb24,
     spatial_table,
     visible_area_detection::{
@@ -11,6 +15,9 @@ use gridbugs::{
 };
 use rand::{Rng, SeedableRng};
 use rand_isaac::Isaac64Rng;
+use std::time::Duration;
+
+const FRAME_DURATION: Duration = Duration::from_micros(1_000_000 / 60);
 
 #[derive(Clone, Copy, Debug)]
 pub enum DoorState {
@@ -47,6 +54,12 @@ impl Tile {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ColourHint {
+    pub foreground: Rgb24,
+    pub background: Rgb24,
+}
+
 // Generates the type for a database storing entities. Each field is a table which maps an `Entity`
 // (just a unique identifier) to a component value.
 // E.g.
@@ -64,6 +77,9 @@ entity_table::declare_entity_module! {
         opacity: u8,
         light: Light<vision_distance::Circle>,
         grass_state: GrassState,
+        realtime: (),
+        colour_hint: ColourHint,
+
     }
 }
 use components::{Components, EntityData, EntityUpdate};
@@ -88,6 +104,7 @@ pub struct World {
     components: Components, // the components of each entity in the world
     entity_allocator: EntityAllocator, // used to allocate new entities
     spatial_table: SpatialTable,
+    realtime_components: RealtimeComponents,
 }
 
 impl World {
@@ -95,11 +112,25 @@ impl World {
         let components = Components::default();
         let spatial_table = SpatialTable::new(size);
         let entity_allocator = EntityAllocator::default();
+        let realtime_components = RealtimeComponents::default();
         Self {
             components,
             spatial_table,
             entity_allocator,
+            realtime_components,
         }
+    }
+
+    pub fn realtime_components_mut(&mut self) -> &mut RealtimeComponents {
+        &mut self.realtime_components
+    }
+
+    pub fn components_mut(&mut self) -> &mut Components {
+        &mut self.components
+    }
+
+    pub fn realtime_entities(&self) -> Entities {
+        self.components.realtime.entities()
     }
 
     // Helper method to spawn an entity at a location
@@ -180,13 +211,17 @@ impl World {
         );
     }
 
-    pub fn spawn_water(&mut self, coord: Coord) {
-        self.spawn_entity(
+    pub fn spawn_water<R: Rng>(&mut self, coord: Coord, rng: &mut R) {
+        let entity = self.spawn_entity(
             (coord, Layer::Floor),
             entity_data! {
                 tile: Tile::Water,
+                realtime: (),
             },
         );
+        self.realtime_components
+            .water_animation
+            .insert(entity, realtime_types::WaterAnimationState::new(rng));
     }
 
     pub fn spawn_grass(&mut self, coord: Coord) {
@@ -234,6 +269,7 @@ impl VisibleWorld for World {
 
 pub struct VisibleEntityData {
     pub tile: Tile,
+    pub colour_hint: Option<ColourHint>,
 }
 
 #[derive(Default)]
@@ -246,7 +282,10 @@ impl VisibleCellData {
         let layers = world.spatial_table.layers_at_checked(coord);
         self.entity_data = layers.option_and_then(|&entity| {
             let maybe_tile = world.components.tile.get(entity).cloned();
-            maybe_tile.map(|tile| VisibleEntityData { tile })
+            maybe_tile.map(|tile| VisibleEntityData {
+                tile,
+                colour_hint: world.components.colour_hint.get(entity).cloned(),
+            })
         });
     }
 }
@@ -270,6 +309,8 @@ pub struct Game {
     visibility_grid: VisibilityGrid<VisibleCellData>,
     config: Config,
     rng: Isaac64Rng,
+    animation_context: AnimationContext,
+    animation_rng: Isaac64Rng,
 }
 
 impl Game {
@@ -287,13 +328,18 @@ impl Game {
             player_entity,
         } = Terrain::generate(world_size, &mut rng);
         let visibility_grid = VisibilityGrid::new(world_size);
+        let animation_context = AnimationContext::default();
+        let animation_rng = Isaac64Rng::from_rng(&mut rng).unwrap();
         let mut self_ = Self {
             world,
             player_entity,
             visibility_grid,
             config,
             rng,
+            animation_context,
+            animation_rng,
         };
+        self_.animation_tick();
         self_.update_visibility();
         self_
     }
@@ -453,5 +499,16 @@ impl Game {
         } else {
             false
         }
+    }
+
+    pub fn animation_tick(&mut self) {
+        self.animation_context.tick(
+            RealtimeContext {
+                world: &mut self.world,
+                rng: &mut self.animation_rng,
+            },
+            FRAME_DURATION,
+        );
+        self.update_visibility();
     }
 }

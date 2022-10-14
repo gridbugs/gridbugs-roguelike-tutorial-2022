@@ -2,6 +2,7 @@ use gridbugs::{chargrid_ansi_terminal, chargrid_wgpu};
 
 mod app;
 mod game;
+mod realtime;
 mod terrain;
 
 // Command-line arguments

@@ -117,10 +117,15 @@ impl GameData {
             Tile::GrassCrushed => RenderCell::BLANK
                 .with_character('\'')
                 .with_foreground(Rgba32::new_rgb(0, 127, 63)),
-            Tile::Water => RenderCell::BLANK
-                .with_character('.')
-                .with_background(Rgba32::new_rgb(0, 63, 127))
-                .with_foreground(Rgba32::new_rgb(0, 127, 187)),
+            Tile::Water => {
+                let colour_hint = visible_entity_data
+                    .colour_hint
+                    .expect("missing colour_hint for water tile");
+                RenderCell::BLANK
+                    .with_character('.')
+                    .with_background(colour_hint.background.to_rgba32(255))
+                    .with_foreground(colour_hint.foreground.to_rgba32(255))
+            }
         }
     }
 
@@ -191,13 +196,17 @@ impl Component for GameComponent {
     }
 
     fn update(&mut self, state: &mut Self::State, _ctx: Ctx, event: Event) -> Self::Output {
-        if let Event::Input(input) = event {
-            if let Some(KeyboardInput::Char('r')) = input.keyboard() {
-                state.game.reset();
+        match event {
+            Event::Input(input) => {
+                if let Some(KeyboardInput::Char('r')) = input.keyboard() {
+                    state.game.reset();
+                }
+                if let Some(game_action) = game_action_from_input(input) {
+                    state.handle_game_action(game_action);
+                }
             }
-            if let Some(game_action) = game_action_from_input(input) {
-                state.handle_game_action(game_action);
-            }
+            Event::Tick(_) => state.game.animation_tick(),
+            _ => (),
         }
     }
 

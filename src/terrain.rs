@@ -595,16 +595,16 @@ impl Terrain {
             use LevelCell::*;
             if *water_map.get_checked(coord) {
                 match cell {
-                    Floor | Door => world.spawn_water(coord),
+                    Floor | Door => world.spawn_water(coord, rng),
                     Wall => {
                         if rng.gen_range(0..100) < 75 {
                             world.spawn_wall(coord)
                         } else {
-                            world.spawn_water(coord);
+                            world.spawn_water(coord, rng);
                         }
                     }
                     CaveFloor | CaveWall => {
-                        world.spawn_water(coord);
+                        world.spawn_water(coord, rng);
                         if *grass_map.get_checked(coord) {
                             world.spawn_grass(coord);
                         }
